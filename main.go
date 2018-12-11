@@ -24,10 +24,13 @@ func main() {
 		}
 	}
 
-	file, _ := os.Create("result.tga")
+	// tgaで出力
+	file, err := os.Create("result.tga")
+	if err != nil {
+		panic(err)
+	}
 	defer file.Close()
 
-	// tgaで出力
 	if err := tga.Encode(file, outputImage); err != nil {
 		panic(err)
 	}
