@@ -2,6 +2,7 @@ package camera
 
 import (
 	"../ray"
+	"github.com/barnex/fmath"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -15,10 +16,8 @@ type Camera struct {
 
 // SetParam パラメータ設定
 func (camera *Camera) SetParam(pos, lockat, vup *vec3.T, fov, aspect float32) {
-	halfHeight := vec3.Sub(pos, lockat)
-	halfHeight.Normalize()
-
-	halfWidth := halfHeight.Scaled(aspect)
+	halfHeight := fmath.Tan((fov * 3.14 / 180.0) * 0.5)
+	halfWidth := aspect * halfHeight
 
 	w := vec3.Sub(pos, lockat)
 	w.Normalize()
@@ -27,18 +26,19 @@ func (camera *Camera) SetParam(pos, lockat, vup *vec3.T, fov, aspect float32) {
 	u.Normalize()
 
 	v := vec3.Cross(&w, &u)
+	v.Normalize()
 
-	halfWidth.Mul(&u)
-	halfHeight.Mul(&v)
+	u.Scale(halfWidth)
+	v.Scale(halfHeight)
 
 	camera.Origin = *pos
 
-	camera.BottomLeft = vec3.Sub(&camera.Origin, &halfWidth)
-	camera.BottomLeft = vec3.Sub(&camera.Origin, &halfHeight)
-	camera.BottomLeft = vec3.Sub(&camera.Origin, &w)
+	camera.BottomLeft = vec3.Sub(&camera.Origin, &u)
+	camera.BottomLeft.Sub(&v)
+	camera.BottomLeft.Sub(&w)
 
-	camera.Horizontal = *halfWidth.Scale(2.0)
-	camera.Vertical = *halfHeight.Scale(2.0)
+	camera.Horizontal = *u.Scale(2.0)
+	camera.Vertical = *v.Scale(2.0)
 }
 
 // GetRay 光線獲得
