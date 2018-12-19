@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"time"
 
 	"github.com/barnex/fmath"
 
@@ -66,6 +67,8 @@ func main() {
 	}
 
 	outputImage := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	rand.Seed(time.Now().UnixNano())
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
