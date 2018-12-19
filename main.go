@@ -39,11 +39,37 @@ func calcColor(ray *ray.Ray, world hitable.Hitable, depth int) vec3.T {
 	return vec3.Interpolate(&vec3.T{1.0, 1.0, 1.0}, &vec3.T{0.5, 0.7, 1.0}, t)
 }
 
+// calcResultPixel 結果画素計算
+func calcResultPixel(x, y, width, height int, camera *camera.Camera, world *hitable.List, outputImage *image.RGBA) {
+	var calcResult vec3.T
+	const samplingCount = 50
+	for i := 0; i < samplingCount; i++ {
+		// ジッタリングを行う
+		u := (float32(x) + rand.Float32()) / float32(width)
+		v := (float32(y) + rand.Float32()) / float32(height)
+
+		// 左下からレイを飛ばして走査していく
+		resultColor := calcColor(camera.GetRay(u, v), world, 0)
+		calcResult.Add(&resultColor)
+	}
+
+	// ガンマ補正
+	color := color.RGBA{
+		uint8(fmath.Sqrt(calcResult[0]/samplingCount) * 255.99),
+		uint8(fmath.Sqrt(calcResult[1]/samplingCount) * 255.99),
+		uint8(fmath.Sqrt(calcResult[2]/samplingCount) * 255.99),
+		255,
+	}
+
+	// Yは逆転しているので反対から書いていく
+	outputImage.SetRGBA(x, height-y-1, color)
+}
+
 func main() {
 	fmt.Println("start")
 
-	width := 1280
-	height := 720
+	const width = 1280
+	const height = 720
 
 	// カメラを作成して、適当なパラメータを与える
 	camera := new(camera.Camera)
@@ -72,29 +98,7 @@ func main() {
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-
-			var calcResult vec3.T
-			const samplingCount = 50
-			for i := 0; i < samplingCount; i++ {
-				// ジッタリングを行う
-				u := (float32(x) + rand.Float32()) / float32(width)
-				v := (float32(y) + rand.Float32()) / float32(height)
-
-				// 左下からレイを飛ばして走査していく
-				resultColor := calcColor(camera.GetRay(u, v), world, 0)
-				calcResult.Add(&resultColor)
-			}
-
-			// ガンマ補正
-			color := color.RGBA{
-				uint8(fmath.Sqrt(calcResult[0]/samplingCount) * 255.99),
-				uint8(fmath.Sqrt(calcResult[1]/samplingCount) * 255.99),
-				uint8(fmath.Sqrt(calcResult[2]/samplingCount) * 255.99),
-				255,
-			}
-
-			// Yは逆転しているので反対から書いていく
-			outputImage.SetRGBA(x, height-y-1, color)
+			calcResultPixel(x, y, width, height, camera, world, outputImage)
 		}
 	}
 
