@@ -138,6 +138,7 @@ func main() {
 
 		var wg sync.WaitGroup
 		wg.Add(numCPU)
+		runtime.GOMAXPROCS(numCPU)
 
 		for i := 0; i < numCPU; i++ {
 			go calcResultPixelAsync(&wg, ch, width, height, camera, world, outputImage)
