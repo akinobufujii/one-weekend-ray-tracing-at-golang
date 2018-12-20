@@ -47,7 +47,12 @@ func calcColor(ray *ray.Ray, world hitable.Hitable, depth int) vec3.T {
 }
 
 // calcResultPixel 結果画素計算
-func calcResultPixel(x, y, width, height int, camera *camera.Camera, world *hitable.List, outputImage *image.RGBA) {
+func calcResultPixel(
+	x, y, width, height int,
+	camera *camera.Camera,
+	world *hitable.List,
+	outputImage *image.RGBA) {
+
 	var calcResult vec3.T
 	const samplingCount = 50
 	for i := 0; i < samplingCount; i++ {
@@ -73,8 +78,13 @@ func calcResultPixel(x, y, width, height int, camera *camera.Camera, world *hita
 }
 
 // calcResultPixelAsync 非同期版
-func calcResultPixelAsync(wateGroup *sync.WaitGroup, block chan WriteBlock, width, height int, camera *camera.Camera, world *hitable.List, outputImage *image.RGBA) {
-	const samplingCount = 50
+func calcResultPixelAsync(
+	wateGroup *sync.WaitGroup,
+	block chan WriteBlock,
+	width, height int,
+	camera *camera.Camera,
+	world *hitable.List,
+	outputImage *image.RGBA) {
 
 	defer wateGroup.Done()
 
@@ -85,28 +95,7 @@ func calcResultPixelAsync(wateGroup *sync.WaitGroup, block chan WriteBlock, widt
 			break
 		}
 
-		var calcResult vec3.T
-
-		for i := 0; i < samplingCount; i++ {
-			// ジッタリングを行う
-			u := (float32(info.x) + rand.Float32()) / float32(width)
-			v := (float32(info.y) + rand.Float32()) / float32(height)
-
-			// 左下からレイを飛ばして走査していく
-			resultColor := calcColor(camera.GetRay(u, v), world, 0)
-			calcResult.Add(&resultColor)
-		}
-
-		// ガンマ補正
-		color := color.RGBA{
-			uint8(fmath.Sqrt(calcResult[0]/samplingCount) * 255.99),
-			uint8(fmath.Sqrt(calcResult[1]/samplingCount) * 255.99),
-			uint8(fmath.Sqrt(calcResult[2]/samplingCount) * 255.99),
-			255,
-		}
-
-		// Yは逆転しているので反対から書いていく
-		outputImage.SetRGBA(info.x, height-info.y-1, color)
+		calcResultPixel(info.x, info.y, width, height, camera, world, outputImage)
 	}
 }
 
