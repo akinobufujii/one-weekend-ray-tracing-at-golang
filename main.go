@@ -7,6 +7,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/barnex/fmath"
@@ -19,6 +21,11 @@ import (
 	"./material"
 	"./ray"
 )
+
+// WriteBlock 書き込みブロック
+type WriteBlock struct {
+	x, y int
+}
 
 // calcRayTrace 色計算（レイトレース処理）
 func calcColor(ray *ray.Ray, world hitable.Hitable, depth int) vec3.T {
@@ -65,6 +72,44 @@ func calcResultPixel(x, y, width, height int, camera *camera.Camera, world *hita
 	outputImage.SetRGBA(x, height-y-1, color)
 }
 
+// calcResultPixelAsync 非同期版
+func calcResultPixelAsync(wateGroup *sync.WaitGroup, block chan WriteBlock, width, height int, camera *camera.Camera, world *hitable.List, outputImage *image.RGBA) {
+	const samplingCount = 50
+
+	defer wateGroup.Done()
+
+	for {
+		info, ok := <-block
+		if !ok {
+			// 処理する情報がもうない
+			break
+		}
+
+		var calcResult vec3.T
+
+		for i := 0; i < samplingCount; i++ {
+			// ジッタリングを行う
+			u := (float32(info.x) + rand.Float32()) / float32(width)
+			v := (float32(info.y) + rand.Float32()) / float32(height)
+
+			// 左下からレイを飛ばして走査していく
+			resultColor := calcColor(camera.GetRay(u, v), world, 0)
+			calcResult.Add(&resultColor)
+		}
+
+		// ガンマ補正
+		color := color.RGBA{
+			uint8(fmath.Sqrt(calcResult[0]/samplingCount) * 255.99),
+			uint8(fmath.Sqrt(calcResult[1]/samplingCount) * 255.99),
+			uint8(fmath.Sqrt(calcResult[2]/samplingCount) * 255.99),
+			255,
+		}
+
+		// Yは逆転しているので反対から書いていく
+		outputImage.SetRGBA(info.x, height-info.y-1, color)
+	}
+}
+
 func main() {
 	fmt.Println("start")
 
@@ -96,9 +141,33 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			calcResultPixel(x, y, width, height, camera, world, outputImage)
+	const isAsync = true
+	if isAsync {
+		// 複数スレッド
+		numCPU := runtime.NumCPU()
+		ch := make(chan WriteBlock, numCPU)
+
+		var wg sync.WaitGroup
+		wg.Add(numCPU)
+
+		for i := 0; i < numCPU; i++ {
+			go calcResultPixelAsync(&wg, ch, width, height, camera, world, outputImage)
+		}
+
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				ch <- WriteBlock{x, y}
+			}
+		}
+
+		close(ch)
+		wg.Wait()
+	} else {
+		// 単一スレッド
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				calcResultPixel(x, y, width, height, camera, world, outputImage)
+			}
 		}
 	}
 
