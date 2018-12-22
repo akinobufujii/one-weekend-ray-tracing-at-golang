@@ -24,7 +24,7 @@ import (
 
 // WriteBlock 書き込みブロック
 type WriteBlock struct {
-	x, y int
+	x, y, width, height int
 }
 
 // calcRayTrace 色計算（レイトレース処理）
@@ -95,7 +95,11 @@ func calcResultPixelAsync(
 			break
 		}
 
-		calcResultPixel(info.x, info.y, imageWidth, imageHeight, camera, world, outputImage)
+		for offsetY := 0; offsetY < info.height; offsetY++ {
+			for offsetX := 0; offsetX < info.width; offsetX++ {
+				calcResultPixel(info.x+offsetX, info.y+offsetY, imageWidth, imageHeight, camera, world, outputImage)
+			}
+		}
 	}
 }
 
@@ -144,9 +148,30 @@ func main() {
 			go calcResultPixelAsync(&wg, ch, imageWidth, imageHeight, camera, world, outputImage)
 		}
 
-		for y := 0; y < imageHeight; y++ {
-			for x := 0; x < imageWidth; x++ {
+		blockWidth := imageWidth / numCPU
+		blockHeight := imageHeight
+		width := imageWidth
+		height := imageHeight
+
+		for y := 0; height > 0; y++ {
+			for x := 0; width > 0; x++ {
+
+				// 各goroutineで計算するブロック幅を計算
+				// 大きすぎたら小さくして計算
+				w := blockWidth
+				if width < blockWidth {
+					w = width
+				}
+
+				h := blockHeight
+				if height < blockHeight {
+					h = height
+				}
+				ch <- WriteBlock{x * blockWidth, y * blockHeight, w, h}
+				width -= blockWidth
 			}
+			width = imageWidth
+			height -= blockHeight
 		}
 
 		close(ch)
