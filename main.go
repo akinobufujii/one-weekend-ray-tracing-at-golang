@@ -48,7 +48,7 @@ func calcColor(ray *ray.Ray, world hitable.Hitable, depth int) vec3.T {
 
 // calcResultPixel 結果画素計算
 func calcResultPixel(
-	x, y, width, height int,
+	x, y, imageWidth, imageHeight int,
 	camera *camera.Camera,
 	world *hitable.List,
 	outputImage *image.RGBA) {
@@ -57,8 +57,8 @@ func calcResultPixel(
 	const samplingCount = 50
 	for i := 0; i < samplingCount; i++ {
 		// ジッタリングを行う
-		u := (float32(x) + rand.Float32()) / float32(width)
-		v := (float32(y) + rand.Float32()) / float32(height)
+		u := (float32(x) + rand.Float32()) / float32(imageWidth)
+		v := (float32(y) + rand.Float32()) / float32(imageHeight)
 
 		// 左下からレイを飛ばして走査していく
 		resultColor := calcColor(camera.GetRay(u, v), world, 0)
@@ -74,14 +74,14 @@ func calcResultPixel(
 	}
 
 	// Yは逆転しているので反対から書いていく
-	outputImage.SetRGBA(x, height-y-1, color)
+	outputImage.SetRGBA(x, imageHeight-y-1, color)
 }
 
 // calcResultPixelAsync 非同期版
 func calcResultPixelAsync(
 	wateGroup *sync.WaitGroup,
 	block chan WriteBlock,
-	width, height int,
+	imageWidth, imageHeight int,
 	camera *camera.Camera,
 	world *hitable.List,
 	outputImage *image.RGBA) {
@@ -95,15 +95,15 @@ func calcResultPixelAsync(
 			break
 		}
 
-		calcResultPixel(info.x, info.y, width, height, camera, world, outputImage)
+		calcResultPixel(info.x, info.y, imageWidth, imageHeight, camera, world, outputImage)
 	}
 }
 
 func main() {
 	fmt.Println("start")
 
-	const width = 1280
-	const height = 720
+	const imageWidth = 1280
+	const imageHeight = 720
 
 	// カメラを作成して、適当なパラメータを与える
 	camera := new(camera.Camera)
@@ -113,7 +113,7 @@ func main() {
 		&vec3.T{0.0, 0.0, -1.0},
 		&vec3.T{0.0, 1.0, 0.0},
 		90.0,
-		float32(width)/float32(height))
+		float32(imageWidth)/float32(imageHeight))
 
 	// レイトレース用のデータ作成
 	world := new(hitable.List)
@@ -126,7 +126,7 @@ func main() {
 		hitable.CreateSphere(&vec3.T{-1.0, 0.0, -1.0}, -0.45, material.CreateLambert(&vec3.T{0.1, 0.2, 0.5})),
 	}
 
-	outputImage := image.NewRGBA(image.Rect(0, 0, width, height))
+	outputImage := image.NewRGBA(image.Rect(0, 0, imageWidth, imageHeight))
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -134,19 +134,18 @@ func main() {
 	if isAsync {
 		// 複数スレッド
 		numCPU := runtime.NumCPU()
-		ch := make(chan WriteBlock, numCPU)
+		ch := make(chan WriteBlock)
 
 		var wg sync.WaitGroup
 		wg.Add(numCPU)
 		runtime.GOMAXPROCS(numCPU)
 
 		for i := 0; i < numCPU; i++ {
-			go calcResultPixelAsync(&wg, ch, width, height, camera, world, outputImage)
+			go calcResultPixelAsync(&wg, ch, imageWidth, imageHeight, camera, world, outputImage)
 		}
 
-		for y := 0; y < height; y++ {
-			for x := 0; x < width; x++ {
-				ch <- WriteBlock{x, y}
+		for y := 0; y < imageHeight; y++ {
+			for x := 0; x < imageWidth; x++ {
 			}
 		}
 
@@ -154,9 +153,9 @@ func main() {
 		wg.Wait()
 	} else {
 		// 単一スレッド
-		for y := 0; y < height; y++ {
-			for x := 0; x < width; x++ {
-				calcResultPixel(x, y, width, height, camera, world, outputImage)
+		for y := 0; y < imageHeight; y++ {
+			for x := 0; x < imageWidth; x++ {
+				calcResultPixel(x, y, imageWidth, imageHeight, camera, world, outputImage)
 			}
 		}
 	}
