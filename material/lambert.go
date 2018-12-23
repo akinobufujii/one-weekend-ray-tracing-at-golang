@@ -1,6 +1,8 @@
 package material
 
 import (
+	"math/rand"
+
 	"../ray"
 	"../utility"
 	"github.com/ungerik/go3d/vec3"
@@ -20,12 +22,12 @@ func CreateLambert(albedo *vec3.T) *Lambert {
 }
 
 // Scatter 散乱結果を返す
-func (lambert *Lambert) Scatter(in *ray.Ray, hitRecord *HitRecord) (isHit bool, attenuation *vec3.T, scattered *ray.Ray) {
+func (lambert *Lambert) Scatter(randomDevice *rand.Rand, in *ray.Ray, hitRecord *HitRecord) (isHit bool, attenuation *vec3.T, scattered *ray.Ray) {
 	// 衝突したところから更にランダムな位置に光線を飛ばして
 	// 各種結果を返す
 	target := hitRecord.Point
 	target.Add(&hitRecord.Normal)
-	target.Add(utility.RandomInUnitSphere())
+	target.Add(utility.RandomInUnitSphere(randomDevice))
 
 	scattered = new(ray.Ray)
 	scattered.Origin = hitRecord.Point

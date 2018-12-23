@@ -1,6 +1,8 @@
 package material
 
 import (
+	"math/rand"
+
 	"../ray"
 	"github.com/ungerik/go3d/vec3"
 )
@@ -8,7 +10,7 @@ import (
 // Material マテリアルインターフェイス
 type Material interface {
 	// Scatter 散乱結果を返す
-	Scatter(in *ray.Ray, hitRecord *HitRecord) (isHit bool, attenuation *vec3.T, scattered *ray.Ray)
+	Scatter(randomDevice *rand.Rand, in *ray.Ray, hitRecord *HitRecord) (isHit bool, attenuation *vec3.T, scattered *ray.Ray)
 }
 
 // HitRecord 衝突結果
