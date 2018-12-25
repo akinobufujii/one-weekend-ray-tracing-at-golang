@@ -153,20 +153,19 @@ func main() {
 		width := imageWidth
 		height := imageHeight
 
+		// 各goroutineで計算するブロック幅を計算
+		// 大きすぎたら小さくして計算
 		for y := 0; height > 0; y++ {
+			h := blockHeight
+			if height < blockHeight {
+				h = height
+			}
 			for x := 0; width > 0; x++ {
-
-				// 各goroutineで計算するブロック幅を計算
-				// 大きすぎたら小さくして計算
 				w := blockWidth
 				if width < blockWidth {
 					w = width
 				}
 
-				h := blockHeight
-				if height < blockHeight {
-					h = height
-				}
 				ch <- WriteBlock{x * blockWidth, y * blockHeight, w, h}
 				width -= blockWidth
 			}
