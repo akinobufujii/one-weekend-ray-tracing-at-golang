@@ -12,14 +12,14 @@ import (
 	"time"
 
 	"github.com/barnex/fmath"
-
 	"github.com/ftrvxmtrx/tga"
+
 	"github.com/ungerik/go3d/vec3"
 
-	"./camera"
-	"./hitable"
-	"./material"
-	"./ray"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/camera"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/hitable"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/material"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 )
 
 // WriteBlock 書き込みブロック
@@ -184,7 +184,7 @@ func main() {
 		}
 	}
 
-	// tgaで出力
+	// pngで出力
 	file, err := os.Create("result.tga")
 	if err != nil {
 		panic(err)

@@ -1,7 +1,7 @@
 package camera
 
 import (
-	"../ray"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 	"github.com/barnex/fmath"
 	"github.com/ungerik/go3d/vec3"
 )

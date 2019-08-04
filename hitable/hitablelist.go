@@ -1,8 +1,8 @@
 package hitable
 
 import (
-	"../material"
-	"../ray"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/material"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 )
 
 // List 衝突物リスト

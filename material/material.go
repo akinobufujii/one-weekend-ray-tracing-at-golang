@@ -3,7 +3,7 @@ package material
 import (
 	"math/rand"
 
-	"../ray"
+	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 	"github.com/ungerik/go3d/vec3"
 )
 
