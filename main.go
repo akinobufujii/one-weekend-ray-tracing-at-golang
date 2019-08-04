@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/png"
 	"math"
 	"math/rand"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/barnex/fmath"
-	"github.com/ftrvxmtrx/tga"
 
 	"github.com/ungerik/go3d/vec3"
 
@@ -185,13 +185,13 @@ func main() {
 	}
 
 	// pngで出力
-	file, err := os.Create("result.tga")
+	file, err := os.Create("result.png")
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	if err := tga.Encode(file, outputImage); err != nil {
+	if err := png.Encode(file, outputImage); err != nil {
 		panic(err)
 	}
 
