@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/barnex/fmath"
@@ -77,38 +76,11 @@ func calcResultPixel(
 	outputImage.SetRGBA(x, imageHeight-y-1, color)
 }
 
-// calcResultPixelAsync 非同期版
-func calcResultPixelAsync(
-	wateGroup *sync.WaitGroup,
-	block chan WriteBlock,
-	randomDevice *rand.Rand,
-	imageWidth, imageHeight int,
-	camera *camera.Camera,
-	world *hitable.List,
-	outputImage *image.RGBA) {
-
-	defer wateGroup.Done()
-
-	for {
-		info, ok := <-block
-		if !ok {
-			// 処理する情報がもうない
-			break
-		}
-
-		for offsetY := 0; offsetY < info.height; offsetY++ {
-			for offsetX := 0; offsetX < info.width; offsetX++ {
-				calcResultPixel(randomDevice, info.x+offsetX, info.y+offsetY, imageWidth, imageHeight, camera, world, outputImage)
-			}
-		}
-	}
-}
-
 func main() {
 	fmt.Println("start")
 
-	const imageWidth = 1280
-	const imageHeight = 720
+	const imageWidth = 1920
+	const imageHeight = 1080
 
 	// カメラを作成して、適当なパラメータを与える
 	camera := new(camera.Camera)
@@ -137,14 +109,24 @@ func main() {
 	if isAsync {
 		// 複数スレッド
 		numCPU := runtime.NumCPU()
-		ch := make(chan WriteBlock)
+		ch := make(chan WriteBlock, numCPU)
 
-		var wg sync.WaitGroup
-		wg.Add(numCPU)
+		done := make(chan struct{})
+
 		runtime.GOMAXPROCS(numCPU)
 
 		for i := 0; i < numCPU; i++ {
-			go calcResultPixelAsync(&wg, ch, rand.New(rand.NewSource(time.Now().Unix())), imageWidth, imageHeight, camera, world, outputImage)
+			go func(randomDevice *rand.Rand) {
+				for info := range ch {
+					for offsetY := 0; offsetY < info.height; offsetY++ {
+						for offsetX := 0; offsetX < info.width; offsetX++ {
+							calcResultPixel(randomDevice, info.x+offsetX, info.y+offsetY, imageWidth, imageHeight, camera, world, outputImage)
+						}
+					}
+				}
+
+				done <- struct{}{}
+			}(rand.New(rand.NewSource(time.Now().Unix())))
 		}
 
 		blockWidth := imageWidth / numCPU
@@ -173,7 +155,9 @@ func main() {
 		}
 
 		close(ch)
-		wg.Wait()
+		for i := 0; i < numCPU; i++ {
+			<-done
+		}
 	} else {
 		// 単一スレッド
 		randomDevice := rand.New(rand.NewSource(time.Now().Unix()))
