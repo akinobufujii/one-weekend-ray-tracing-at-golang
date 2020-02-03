@@ -26,6 +26,12 @@ type WriteLine struct {
 	y, width int
 }
 
+// ReadLine 読み込み込みライン
+type ReadLine struct {
+	y      int
+	colors []color.RGBA
+}
+
 // calcRayTrace 色計算（レイトレース処理）
 func calcColor(randomDevice *rand.Rand, ray *ray.Ray, world hitable.Hitable, depth int) vec3.T {
 	// シャドウアクネ問題を解決するために
@@ -105,34 +111,51 @@ func main() {
 	if isAsync {
 		// 複数スレッド
 		numCPU := runtime.NumCPU()
-		ch := make(chan WriteLine, numCPU)
 
-		done := make(chan struct{})
+		writeLineStream := make(chan WriteLine, numCPU)
+		readLineStream := make(chan ReadLine, numCPU)
+		doneSendReadLine := make(chan struct{}, numCPU)
+		doneAll := make(chan struct{})
+
+		// 情報送信goroutine
+		go func() {
+			// 横1列を高さ分渡して並列化
+			for y := 0; y < imageHeight; y++ {
+				writeLineStream <- WriteLine{y, imageWidth}
+			}
+			close(writeLineStream)
+		}()
 
 		for i := 0; i < numCPU; i++ {
+			// ピクセル計算goroutine
 			go func(randomDevice *rand.Rand) {
-				for info := range ch {
+				for info := range writeLineStream {
+					color := make([]color.RGBA, info.width)
 					for x := 0; x < info.width; x++ {
-						color := calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world)
-
-						// Yは逆転しているので反対から書いていく
-						outputImage.SetRGBA(x, imageHeight-info.y-1, color)
+						color[x] = calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world)
 					}
+					readLineStream <- ReadLine{info.y, color}
 				}
-
-				done <- struct{}{}
+				doneSendReadLine <- struct{}{}
 			}(rand.New(rand.NewSource(time.Now().Unix())))
 		}
 
-		// 横1列を高さ分渡して並列化
-		for y := 0; y < imageHeight; y++ {
-			ch <- WriteLine{y, imageWidth}
-		}
+		// ピクセル合成goroutine
+		go func() {
+			for readLine := range readLineStream {
+				for x, color := range readLine.colors {
+					// Yは逆転しているので反対から書いていく
+					outputImage.SetRGBA(x, imageHeight-readLine.y-1, color)
+				}
+			}
+			doneAll <- struct{}{}
+		}()
 
-		close(ch)
 		for i := 0; i < numCPU; i++ {
-			<-done
+			<-doneSendReadLine
 		}
+		close(readLineStream)
+		<-doneAll
 	} else {
 		// 単一スレッド
 		randomDevice := rand.New(rand.NewSource(time.Now().Unix()))
