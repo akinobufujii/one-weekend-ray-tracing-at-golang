@@ -49,8 +49,7 @@ func calcResultPixel(
 	randomDevice *rand.Rand,
 	x, y, imageWidth, imageHeight int,
 	camera *camera.Camera,
-	world *hitable.List,
-	outputImage *image.RGBA) {
+	world *hitable.List) color.RGBA {
 
 	var calcResult vec3.T
 	const samplingCount = 50
@@ -65,15 +64,12 @@ func calcResultPixel(
 	}
 
 	// ガンマ補正
-	color := color.RGBA{
+	return color.RGBA{
 		uint8(fmath.Sqrt(calcResult[0]/samplingCount) * 255.99),
 		uint8(fmath.Sqrt(calcResult[1]/samplingCount) * 255.99),
 		uint8(fmath.Sqrt(calcResult[2]/samplingCount) * 255.99),
 		255,
 	}
-
-	// Yは逆転しているので反対から書いていく
-	outputImage.SetRGBA(x, imageHeight-y-1, color)
 }
 
 func main() {
@@ -117,7 +113,10 @@ func main() {
 			go func(randomDevice *rand.Rand) {
 				for info := range ch {
 					for x := 0; x < info.width; x++ {
-						calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world, outputImage)
+						color := calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world)
+
+						// Yは逆転しているので反対から書いていく
+						outputImage.SetRGBA(x, imageHeight-info.y-1, color)
 					}
 				}
 
@@ -139,7 +138,10 @@ func main() {
 		randomDevice := rand.New(rand.NewSource(time.Now().Unix()))
 		for y := 0; y < imageHeight; y++ {
 			for x := 0; x < imageWidth; x++ {
-				calcResultPixel(randomDevice, x, y, imageWidth, imageHeight, camera, world, outputImage)
+				color := calcResultPixel(randomDevice, x, y, imageWidth, imageHeight, camera, world)
+
+				// Yは逆転しているので反対から書いていく
+				outputImage.SetRGBA(x, imageHeight-y-1, color)
 			}
 		}
 	}
