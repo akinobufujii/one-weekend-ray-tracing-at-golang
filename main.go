@@ -113,8 +113,6 @@ func main() {
 
 		done := make(chan struct{})
 
-		runtime.GOMAXPROCS(numCPU)
-
 		for i := 0; i < numCPU; i++ {
 			go func(randomDevice *rand.Rand) {
 				for info := range ch {
@@ -129,8 +127,9 @@ func main() {
 			}(rand.New(rand.NewSource(time.Now().Unix())))
 		}
 
-		blockWidth := imageWidth / numCPU
-		blockHeight := imageHeight
+		// 横1列を高さ分渡して並列化
+		blockWidth := imageWidth
+		blockHeight := 1
 		width := imageWidth
 		height := imageHeight
 
