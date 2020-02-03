@@ -21,9 +21,9 @@ import (
 	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 )
 
-// WriteBlock 書き込みブロック
-type WriteBlock struct {
-	x, y, width, height int
+// WriteLine 書き込みライン
+type WriteLine struct {
+	y, width int
 }
 
 // calcRayTrace 色計算（レイトレース処理）
@@ -109,17 +109,15 @@ func main() {
 	if isAsync {
 		// 複数スレッド
 		numCPU := runtime.NumCPU()
-		ch := make(chan WriteBlock, numCPU)
+		ch := make(chan WriteLine, numCPU)
 
 		done := make(chan struct{})
 
 		for i := 0; i < numCPU; i++ {
 			go func(randomDevice *rand.Rand) {
 				for info := range ch {
-					for offsetY := 0; offsetY < info.height; offsetY++ {
-						for offsetX := 0; offsetX < info.width; offsetX++ {
-							calcResultPixel(randomDevice, info.x+offsetX, info.y+offsetY, imageWidth, imageHeight, camera, world, outputImage)
-						}
+					for x := 0; x < info.width; x++ {
+						calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world, outputImage)
 					}
 				}
 
@@ -128,29 +126,8 @@ func main() {
 		}
 
 		// 横1列を高さ分渡して並列化
-		blockWidth := imageWidth
-		blockHeight := 1
-		width := imageWidth
-		height := imageHeight
-
-		// 各goroutineで計算するブロック幅を計算
-		// 大きすぎたら小さくして計算
-		for y := 0; height > 0; y++ {
-			h := blockHeight
-			if height < blockHeight {
-				h = height
-			}
-			for x := 0; width > 0; x++ {
-				w := blockWidth
-				if width < blockWidth {
-					w = width
-				}
-
-				ch <- WriteBlock{x * blockWidth, y * blockHeight, w, h}
-				width -= blockWidth
-			}
-			width = imageWidth
-			height -= blockHeight
+		for y := 0; y < imageHeight; y++ {
+			ch <- WriteLine{y, imageWidth}
 		}
 
 		close(ch)
