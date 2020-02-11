@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/barnex/fmath"
@@ -21,13 +22,14 @@ import (
 	"github.com/akinobufujii/one-weekend-ray-tracing-at-golang/ray"
 )
 
-// WriteLine 書き込みライン
-type WriteLine struct {
-	y, width int
+// CalcPixelLineInfo 計算ピクセル行情報
+type CalcPixelLineInfo struct {
+	y     int
+	width int
 }
 
-// ReadLine 読み込み込みライン
-type ReadLine struct {
+// ResultPixelLine 結果ピクセル行
+type ResultPixelLine struct {
 	y      int
 	colors []color.RGBA
 }
@@ -78,6 +80,59 @@ func calcResultPixel(
 	}
 }
 
+// sendCalcPixelLine 計算行送信
+func sendCalcPixelLine(imageWidth, imageHeight int) <-chan CalcPixelLineInfo {
+	ch := make(chan CalcPixelLineInfo)
+
+	go func() {
+		// 横1列を高さ分渡して並列化
+		for y := 0; y < imageHeight; y++ {
+			ch <- CalcPixelLineInfo{y, imageWidth}
+		}
+		close(ch)
+	}()
+
+	return ch
+}
+
+// calcPixelLine 行計算
+func calcPixelLine(calcPixelLineInfoStream <-chan CalcPixelLineInfo,
+	imageWidth, imageHeight int,
+	camera *camera.Camera,
+	world *hitable.List) <-chan ResultPixelLine {
+
+	ch := make(chan ResultPixelLine)
+
+	// 重い処理なので並列化させる
+	numCPU := runtime.NumCPU()
+	wait := sync.WaitGroup{}
+	wait.Add(numCPU)
+
+	for i := 0; i < numCPU; i++ {
+		// ピクセル計算goroutine
+		go func(randomDevice *rand.Rand) {
+			for info := range calcPixelLineInfoStream {
+				color := make([]color.RGBA, info.width)
+				for x := 0; x < info.width; x++ {
+					color[x] = calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world)
+				}
+
+				// 計算結果は一つのチャネルに送信
+				ch <- ResultPixelLine{info.y, color}
+			}
+			wait.Done()
+		}(rand.New(rand.NewSource(time.Now().Unix())))
+	}
+
+	// 計算goroutineがすべて終了したらチャネルをクローズして終了を伝える
+	go func() {
+		wait.Wait()
+		close(ch)
+	}()
+
+	return ch
+}
+
 func main() {
 	fmt.Println("start")
 
@@ -109,53 +164,18 @@ func main() {
 
 	const isAsync = true
 	if isAsync {
-		// 複数スレッド
-		numCPU := runtime.NumCPU()
+		// パイプラインとして処理
+		calcPixelLineInfoStream := sendCalcPixelLine(imageWidth, imageHeight)
+		resultPixelLineStream := calcPixelLine(calcPixelLineInfoStream, imageWidth, imageHeight, camera, world)
 
-		writeLineStream := make(chan WriteLine, numCPU)
-		readLineStream := make(chan ReadLine, numCPU)
-		doneSendReadLine := make(chan struct{}, numCPU)
-		doneAll := make(chan struct{})
-
-		// 情報送信goroutine
-		go func() {
-			// 横1列を高さ分渡して並列化
-			for y := 0; y < imageHeight; y++ {
-				writeLineStream <- WriteLine{y, imageWidth}
+		// 計算結果を合成
+		for readLine := range resultPixelLineStream {
+			for x, color := range readLine.colors {
+				// Yは逆転しているので反対から書いていく
+				outputImage.SetRGBA(x, imageHeight-readLine.y-1, color)
 			}
-			close(writeLineStream)
-		}()
-
-		for i := 0; i < numCPU; i++ {
-			// ピクセル計算goroutine
-			go func(randomDevice *rand.Rand) {
-				for info := range writeLineStream {
-					color := make([]color.RGBA, info.width)
-					for x := 0; x < info.width; x++ {
-						color[x] = calcResultPixel(randomDevice, x, info.y, imageWidth, imageHeight, camera, world)
-					}
-					readLineStream <- ReadLine{info.y, color}
-				}
-				doneSendReadLine <- struct{}{}
-			}(rand.New(rand.NewSource(time.Now().Unix())))
 		}
 
-		// ピクセル合成goroutine
-		go func() {
-			for readLine := range readLineStream {
-				for x, color := range readLine.colors {
-					// Yは逆転しているので反対から書いていく
-					outputImage.SetRGBA(x, imageHeight-readLine.y-1, color)
-				}
-			}
-			doneAll <- struct{}{}
-		}()
-
-		for i := 0; i < numCPU; i++ {
-			<-doneSendReadLine
-		}
-		close(readLineStream)
-		<-doneAll
 	} else {
 		// 単一スレッド
 		randomDevice := rand.New(rand.NewSource(time.Now().Unix()))
